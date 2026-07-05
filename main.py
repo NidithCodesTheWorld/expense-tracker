@@ -1,19 +1,45 @@
 import os
+import datetime
+from typing import List
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware  # <-- ADDED
 from sqlalchemy.orm import Session
-from typing import List
-import datetime
 
 from .database import engine, get_db, Base
 from . import models, schemas, auth, chatbot
 
-# Create tables
+# Initialize database schema constraints 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="My-Money API")
+
+# --- Configure Cross-Origin Resource Sharing (CORS) ---
+# Allows your decoupled GitHub Pages domain to securely interface with the API runtime
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:5500",
+    "http://127.0.0.1:8000",
+]
+
+# Dynamically add your GitHub Pages custom origin block via environment vars if present
+PRODUCTION_DOMAIN = os.getenv("FRONTEND_PRODUCTION_URL")
+if PRODUCTION_DOMAIN:
+    origins.append(PRODUCTION_DOMAIN)
+else:
+    # Fallback to wildcard or broad check for testing; restrict explicitly in production
+    origins.append("https://*.github.io")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_origin_regex="https://.*\\.github\\.io", # Securely matches all subdomains under github.io
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Seed default categories if they don't exist
 @app.on_event("startup")
@@ -42,8 +68,6 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    
-    # Also add default reference categories if needed, but the user will see global ones (user_id=None)
     return new_user
 
 @app.post("/api/auth/login", response_model=schemas.Token)
@@ -65,14 +89,12 @@ def read_users_me(current_user: models.User = Depends(auth.get_current_user)):
 # --- Category Routes ---
 @app.get("/api/categories", response_model=List[schemas.CategoryResponse])
 def get_categories(current_user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
-    # Retrieve user's custom categories plus global ones
     return db.query(models.Category).filter(
         (models.Category.user_id == current_user.id) | (models.Category.user_id == None)
     ).all()
 
 @app.post("/api/categories", response_model=schemas.CategoryResponse)
 def create_category(category: schemas.CategoryCreate, current_user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
-    # Check if category already exists for this user (or globally)
     exists = db.query(models.Category).filter(
         models.Category.name == category.name,
         (models.Category.user_id == current_user.id) | (models.Category.user_id == None)
@@ -90,7 +112,6 @@ def create_category(category: schemas.CategoryCreate, current_user: models.User 
 @app.get("/api/expenses", response_model=List[schemas.ExpenseResponse])
 def get_expenses(current_user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
     expenses = db.query(models.Expense).filter(models.Expense.user_id == current_user.id).order_by(models.Expense.date.desc()).all()
-    # Build custom response to include category name
     res = []
     for exp in expenses:
         res.append(schemas.ExpenseResponse(
@@ -106,7 +127,6 @@ def get_expenses(current_user: models.User = Depends(auth.get_current_user), db:
 
 @app.post("/api/expenses", response_model=schemas.ExpenseResponse)
 def create_expense(expense: schemas.ExpenseCreate, current_user: models.User = Depends(auth.get_current_user), db: Session = Depends(get_db)):
-    # Verify category exists and belongs to user or is global
     category = db.query(models.Category).filter(
         models.Category.id == expense.category_id,
         (models.Category.user_id == current_user.id) | (models.Category.user_id == None)
@@ -160,11 +180,10 @@ def chat_with_jarvis(message: schemas.ChatMessage, current_user: models.User = D
         updated_expenses=result.get("updated_expenses")
     )
 
-# --- Serving Frontend Static Files ---
+# --- Serving Frontend Static Files (Kept active for local testing loops) ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
-# Serve specific asset routes or the whole static directory
 if os.path.exists(FRONTEND_DIR):
     app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
@@ -173,4 +192,4 @@ def read_root():
     index_path = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
-    return {"message": "Frontend files not found. Please create the frontend directory and index.html."}
+    return {"message": "Server system live. UI running decoupled."}
