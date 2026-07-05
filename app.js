@@ -1,7 +1,7 @@
 // --- Decoupled Infrastructure Routing ---
 // Switches base API URI automatically depending on local or production context
 const LOCAL_API_URL = "http://127.0.0.1:8000";
-const PRODUCTION_API_URL = "https://your-backend-app-name.onrender.com"; // <-- REPLACE WITH YOUR LIVE RENDER/RAILWAY DEPLOYED BACKEND URL
+const PRODUCTION_API_URL = "https://expense-tracker-xxxx.onrender.com"; // <-- REPLACE WITH YOUR LIVE RENDER/RAILWAY DEPLOYED BACKEND URL
 
 const API_URL = (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") 
     ? LOCAL_API_URL 
