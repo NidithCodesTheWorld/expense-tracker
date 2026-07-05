@@ -1,5 +1,11 @@
-// API configuration
-const API_URL = window.location.origin;
+// --- Decoupled Infrastructure Routing ---
+// Switches base API URI automatically depending on local or production context
+const LOCAL_API_URL = "http://127.0.0.1:8000";
+const PRODUCTION_API_URL = "https://your-backend-app-name.onrender.com"; // <-- REPLACE WITH YOUR LIVE RENDER/RAILWAY DEPLOYED BACKEND URL
+
+const API_URL = (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") 
+    ? LOCAL_API_URL 
+    : PRODUCTION_API_URL;
 
 // State
 let token = localStorage.getItem('token') || null;
@@ -8,6 +14,7 @@ let expenses = [];
 let categories = [];
 let activeTimeframe = 'all';
 
+// [Keep all other downstream UI logic, functions, and listeners exactly the same as your current file]
 // Category Visual styles (Icons and Colors)
 const categoryStyles = {
     'movies': { icon: 'fa-film', color: '#f5576c' },
